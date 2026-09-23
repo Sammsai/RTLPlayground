@@ -90,6 +90,7 @@ sy_rebooting:"Rebooting, reconnect in about 20 s",sy_bytes:"bytes",
 cw_title:"Write this startup configuration?",cw_save_title:"Save running configuration to flash?",
 cw_info:"{n} / 2048 bytes, replayed line by line on every boot",
 cw_toolarge:"Too large: the config sector accepts at most 2048 bytes. Remove lines first.",
+cw_longline:"Line {n} is {m} bytes long: the switch can only replay lines up to 126 bytes and would skip it on boot, so the write is refused. Shorten it first.",
 cw_unknown:"Not in the known config grammar (will still be written): ",cw_empty:"(empty)",
 cw_writing:"Writing configuration...",cw_failed:"config write failed: HTTP {n}",
 cw_verify_fail:"Verification failed: flash content differs from what was sent. Command log NOT cleared.",
@@ -201,6 +202,7 @@ sy_rebooting:"再起動中です。約 20 秒後に再接続してください",
 cw_title:"この起動設定を書き込みますか?",cw_save_title:"実行中の設定をフラッシュに保存しますか?",
 cw_info:"{n} / 2048 バイト、起動のたびに 1 行ずつ実行されます",
 cw_toolarge:"サイズ超過: 設定セクタは最大 2048 バイトです。先に行を削除してください。",
+cw_longline:"{n} 行目は {m} バイトです: スイッチが起動時に実行できる行は 126 バイトまでで、この行は読み飛ばされるため、書き込みを拒否します。先に短くしてください。",
 cw_unknown:"既知の設定文法に含まれない行 (そのまま書き込まれます): ",cw_empty:"(空)",
 cw_writing:"設定を書き込み中...",cw_failed:"設定の書き込みに失敗しました: HTTP {n}",
 cw_verify_fail:"検証失敗: フラッシュの内容が送信内容と異なります。コマンドログは消去されていません。",
@@ -312,6 +314,7 @@ sy_rebooting:"正在重启，约 20 秒后重新连接",sy_bytes:"字节",
 cw_title:"写入此启动配置?",cw_save_title:"将运行配置保存到 Flash?",
 cw_info:"{n} / 2048 字节，每次启动时逐行执行",
 cw_toolarge:"过大: 配置扇区最多容纳 2048 字节。请先删除部分行。",
+cw_longline:"第 {n} 行有 {m} 字节: 交换机启动时只能执行不超过 126 字节的行，该行会被跳过，因此拒绝写入。请先缩短该行。",
 cw_unknown:"不属于已知配置语法的行 (仍会写入): ",cw_empty:"(空)",
 cw_writing:"正在写入配置...",cw_failed:"配置写入失败: HTTP {n}",
 cw_verify_fail:"校验失败: Flash 内容与发送内容不一致。命令日志未清除。",
@@ -1715,11 +1718,16 @@ function cfgReload(){
     cfgParseKnown(x);
   }).catch(function(){});
 }
+function cfgLongLine(v){
+  var ls=v.split("\n");
+  for(var i=0;i<ls.length;i++){var n=new Blob([ls[i]]).size;if(n>126)return{n:i+1,m:n};}
+  return null;
+}
 function cfgBytes(){
-  var n=new Blob([$("cfgedit").value]).size;
+  var v=$("cfgedit").value,n=new Blob([v]).size;
   var el=$("cfgbytes");
   el.textContent=n+" / 2048 "+t("sy_bytes");
-  el.style.color=n>2048?"var(--bad)":"";
+  el.style.color=(n>2048||cfgLongLine(v))?"var(--bad)":"";
   return n;
 }
 $("cfgedit").addEventListener("input",cfgBytes);
@@ -1733,7 +1741,7 @@ var CONF_OVERWRITE=[
   /^ip\b/,/^gw\b/,/^netmask\b/,/^hostname\b/,
   /^syslog\s+ip\b/,/^syslog\s+port\b/,/^passwd\b/,
   /^vlan\s+\d{1,4}\s+mgmt$/,/^vlan\s+\d{1,4}(?!\s+mgmt\b)/,
-  /^pvid\s+\d{1,2}\b/,/^ingress\b/,
+  /^pvid\s+\d{1,2}\b/,
   /^port\s+\d{1,2}(?!\s+name\b)/,/^port\s+\d{1,2}\s+name\b/,
   /^mirror\b/,
   /^lag\s+\d\b/,/^laghash\s+\d\b/,/^isolate\s+\d{1,2}\b/,
@@ -1759,6 +1767,21 @@ function mergeConf(base,texts){
       }
       if(line==="mirror off"){drop(/^mirror /);return;}
       if(!isConfCmd(line))return;
+      if((m=line.match(/^ingress (.+)$/))){
+        if(/^[tua]$/.test(m[1])){drop(/^ingress /);conf.push(line);return;}
+        var ports={},order=[],last=-1;
+        conf.forEach(function(c,i){if(/^ingress [tua]$/.test(c))last=i;});
+        conf.forEach(function(c,i){
+          var cm=c.match(/^ingress (.+)$/);
+          if(!cm||/^[tua]$/.test(cm[1])||i<last)return;
+          cm[1].split(" ").forEach(function(tk){var n=tk.slice(0,-1);if(!(n in ports))order.push(n);ports[n]=tk;});
+        });
+        m[1].split(" ").forEach(function(tk){var n=tk.slice(0,-1);if(!(n in ports))order.push(n);ports[n]=tk;});
+        conf=conf.filter(function(c){var cm=c.match(/^ingress (.+)$/);return!cm||/^[tua]$/.test(cm[1])});
+        order.sort(function(a,b){return a-b});
+        conf.push("ingress "+order.map(function(n){return ports[n]}).join(" "));
+        return;
+      }
       if((m=line.match(/^bw (in|out) (\d{1,2}) (\S+)$/))){
         var pre="^bw "+m[1]+" "+m[2]+" ";
         if(m[1]==="out"||m[3]==="off")drop(new RegExp(pre));
@@ -1786,18 +1809,18 @@ function mergeConf(base,texts){
   });
   return conf;
 }
-function writeConfig(txt,title){
+function writeConfig(txt,title,fromLog){
   var info=h("p",{class:"small mut"}),warn=h("p",{class:"small"});
   var ed=h("textarea",{class:"cfg",spellcheck:"false",placeholder:t("cw_empty"),style:"min-height:45vh"});
   ed.value=txt.replace(/\r\n/g,"\n");
-  var ok=h("button",{class:"ctl pri",text:t("sy_write"),onclick:function(){closeModal();doWriteConfig(cfgText(ed.value))}});
+  var ok=h("button",{class:"ctl pri",text:t("sy_write"),onclick:function(){closeModal();doWriteConfig(cfgText(ed.value),fromLog)}});
   function refresh(){
-    var v=cfgText(ed.value),bytes=new Blob([v]).size;
+    var v=cfgText(ed.value),bytes=new Blob([v]).size,long=cfgLongLine(v);
     var unknown=v.split("\n").filter(function(l){return l.trim()&&!isConfCmd(l.trim().replace(/\s+/g," "))});
     info.textContent=t("cw_info",{n:bytes});
-    ok.disabled=bytes>2048;
+    ok.disabled=bytes>2048||!!long;
     warn.style.color=ok.disabled?"var(--bad)":"var(--warn)";
-    warn.textContent=ok.disabled?t("cw_toolarge"):(unknown.length?t("cw_unknown")+unknown.join(" | "):"");
+    warn.textContent=bytes>2048?t("cw_toolarge"):long?t("cw_longline",long):(unknown.length?t("cw_unknown")+unknown.join(" | "):"");
   }
   ed.addEventListener("input",refresh);refresh();
   modal(title,h("div",null,[info,warn,ed]),[h("button",{class:"ctl",text:t("c_cancel"),onclick:closeModal}),ok]);
@@ -1806,7 +1829,7 @@ function cfgText(txt){
   txt=txt.replace(/\r\n/g,"\n");
   return txt&&txt.slice(-1)!=="\n"?txt+"\n":txt;
 }
-function doWriteConfig(txt){
+function doWriteConfig(txt,fromLog){
   var form=new FormData();
   form.append("configuration",new Blob([txt],{type:"application/octet-stream"}),"config.txt");
   toast(t("cw_writing"));
@@ -1816,9 +1839,10 @@ function doWriteConfig(txt){
   }).then(function(back){
     back=back.replace(/\0[\s\S]*$/,"").replace(/\r\n/g,"\n").trim();
     if(back!==txt.trim())throw new Error(t("cw_verify_fail"));
-    return api("/cmd_log_clear").catch(function(){});
-  }).then(function(){
-    setDirty(false);
+    if(!fromLog)return false;
+    return api("/cmd_log_clear").then(function(){return true},function(){return true});
+  }).then(function(cleared){
+    if(cleared)setDirty(false);
     $("cfgedit").value=txt;cfgBytes();cfgParseKnown(txt);
     toast(t("cw_saved"),"ok");
   }).catch(function(e){toast(e.message||String(e),"err")});
@@ -1829,9 +1853,9 @@ $("saveBtn").addEventListener("click",function(){
     getText("/config").catch(function(){return""}),
     getText("/cmd_log").catch(function(){return""}),
   ]).then(function(r){
-    var cur=r[0].replace(/\0[\s\S]*$/,"");
-    var merged=mergeConf([],[cur,r[1].replace(/\0[\s\S]*$/,"")]);
-    writeConfig(merged.join("\n"),t("cw_save_title"));
+    var cur=r[0].replace(/\0[\s\S]*$/,"").split(/\r?\n/).map(function(l){return l.trim().replace(/\s+/g," ")}).filter(Boolean);
+    var merged=mergeConf(cur,[r[1].replace(/\0[\s\S]*$/,"")]);
+    writeConfig(merged.join("\n"),t("cw_save_title"),true);
   });
 });
 
