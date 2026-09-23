@@ -111,10 +111,20 @@ void machine_custom_init(void) __banked
 	REG_SET(RTL837X_PIN_MUX_0, 0x30db68bf);
 }
 
-#elif defined(MACHINE_FG_4GT_2SX_V2_0) || defined(MACHINE_HY_TFS106)
+#elif defined MACHINE_FG_4GT_2SX_V2_0
 void machine_custom_init(void) __banked
 {
 	REG_SET(RTL837X_REG_LED_GLB_IO_EN, 0x7624155b);
+}
+
+#elif defined MACHINE_HY_TFS106
+void machine_custom_init(void) __banked
+{
+    reg_bit_set(RTL837X_REG_LED_GLB_IO_EN, 6);
+    // 启用单灯双色 Bi-Color 模式
+    reg_bit_set(RTL837X_REG_LED_MODE, 17);
+    reg_bit_clear(RTL837X_REG_LED_MODE, 9);
+    reg_bit_clear(RTL837X_REG_LED_MODE, 7);
 }
 
 #else
