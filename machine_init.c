@@ -111,7 +111,7 @@ void machine_custom_init(void) __banked
 	REG_SET(RTL837X_PIN_MUX_0, 0x30db68bf);
 }
 
-#elif defined MACHINE_FG_4GT_2SX_V2_0
+#elif defined(MACHINE_FG_4GT_2SX_V2_0) || defined(MACHINE_HY_TFS106)
 void machine_custom_init(void) __banked
 {
 	REG_SET(RTL837X_REG_LED_GLB_IO_EN, 0x7624155b);
