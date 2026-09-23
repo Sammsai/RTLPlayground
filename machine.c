@@ -1136,8 +1136,8 @@ __code const struct machine machine = {
 	// .sfp_port[0].pin_los = GPIO_NA,
 	// .sfp_port[0].sds = 0,
 	// .sfp_port[0].i2c = I2CBUS( GPIO41_I2C_SDA3_MDIO1, GPIO40_I2C_SCL3_MDC1 ),
-    .sfp_port[0].pin_detect = GPIO30_ACL_BIT3_EN, // 或测试原有的 GPIO37/38
-    .sfp_port[0].pin_los = GPIO37, 
+    .sfp_port[0].pin_detect = GPIO37, // 或测试原有的 GPIO37/38
+    .sfp_port[0].pin_los = GPIO_NA, 
     .sfp_port[0].pin_tx_disable = GPIO_NA, 
     .sfp_port[0].sds = 0, // 调换 SDS 通道
     .sfp_port[0].i2c = I2CBUS( GPIO41_I2C_SDA3_MDIO1, GPIO40_I2C_SCL3_MDC1 ),
@@ -1146,8 +1146,8 @@ __code const struct machine machine = {
 	// .sfp_port[1].pin_los = GPIO_NA,
 	// .sfp_port[1].sds = 1,
 	// .sfp_port[1].i2c = I2CBUS( GPIO39_I2C_SDA4, GPIO40_I2C_SCL3_MDC1 ),
-    .sfp_port[1].pin_detect = GPIO50_I2C_SCL2_UART1_TX,
-    .sfp_port[1].pin_los = GPIO51_I2C_SDA2_UART1_RX, 
+    .sfp_port[1].pin_detect = GPIO38,
+    .sfp_port[1].pin_los = GPIO_NA, 
     .sfp_port[1].pin_tx_disable = GPIO_NA, 
     .sfp_port[1].sds = 1, // 调换 SDS 通道
     .sfp_port[1].i2c = I2CBUS( GPIO39_I2C_SDA4, GPIO40_I2C_SCL3_MDC1 ),
@@ -1189,20 +1189,9 @@ __code const struct machine machine = {
 	 },
 	.led_mux_custom = 1,
 	.led_mux = {
-				/* Pad 0..2: SFP2 灯 (物理端口 6) */
-				0x18, 0x19, 0x1a,
-				/* Pad 3..5: Port 2 灯 (物理端口 2，黄绿对调) */
-				0x09, 0x08, 0x09,
-				/* Pad 6..8: Port 4 灯 (物理端口 4，黄绿对调) */
-				0x11, 0x10, 0x11,
-				/* Pad 9..11: Port 3 灯 (物理端口 3，黄绿对调) */
-				0x0d, 0x0c, 0x0d,
-				/* Pad 12..14: Port 1 灯 (物理端口 1，已验证正常) */
-				0x04, 0x05, 0x04,
-				/* Pad 15..17: SFP1 灯 (物理端口 5) */
-				0x14, 0x15, 0x16,
-				/* Pad 18..27: 剩余未使用的引脚 */
-				0x1c, 0x1d, 0x1e, 0x20, 0x21, 0x22, 0x23, 0x3f, 0x3f, 0x3f
+				0x00,0x01,0x04,0x05,0x08,0x09,0x0c,0x3f,0x0d,0x10,
+				0x11,0x0e,0x14,0x11,0x12,0x15,0x15,0x16,0x18,0x19,
+				0x1a,0x19,0x1d,0x1e,0x1c,0x1d,0x20,0x21
 		},
 	};
 
